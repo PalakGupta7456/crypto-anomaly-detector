@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market Seismograph — crypto anomaly detection</title>
+  <meta name="description" content="An LSTM autoencoder watches eight crypto markets hour by hour and flags behaviour it has not seen before.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#">Market Seismograph</a>
+    <p class="asof" id="asof">Loading live markets…</p>
+    <nav><a href="#model">Model</a><a href="#how">How it works</a><a id="repo" href="https://github.com/PalakGupta7456/crypto-anomaly-detector">GitHub</a></nav>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>Eight markets, read every hour.<br>Tremors are hours the model could not explain.</h1>
+      <p>An LSTM autoencoder learned what normal price, volume and volatility patterns look like. When the newest hours don't fit, the strip below spikes.</p>
+    </section>
+
+    <section class="board" aria-label="Anomaly severity for each coin, last 48 hours">
+      <div class="board-head">
+        <span>Coin</span><span>Price</span><span>24h</span><span class="strip-label">Last 48 hours of severity <i class="key"></i> above threshold</span><span>Now</span>
+      </div>
+      <ol id="board"></ol>
+    </section>
+
+    <section class="detail">
+      <div class="detail-main">
+        <div class="detail-head">
+          <h2 id="coin-title">—</h2>
+          <p id="coin-sub"></p>
+        </div>
+        <div class="chart price"><canvas id="price" role="img" aria-label="Price over the last 7 days with anomalies marked"></canvas></div>
+        <div class="chart sev"><canvas id="sev" role="img" aria-label="Anomaly severity over the last 7 days"></canvas></div>
+      </div>
+      <aside class="feed">
+        <h2>Latest tremors</h2>
+        <p class="feed-sub" id="feed-sub"></p>
+        <ul id="feed"></ul>
+      </aside>
+    </section>
+
+    <section class="model" id="model">
+      <h2>Does it actually catch anomalies?</h2>
+      <p class="lead">Real market anomalies have no labels, so we plant known ones: price spikes, volume bursts with flat prices, volatility blow-outs and pump-and-dumps. Each detector is then scored on held-out data it never trained on.</p>
+      <div class="model-grid">
+        <div>
+          <h3>Ranking quality by detector</h3>
+          <canvas id="bench" role="img" aria-label="Benchmark of three detectors"></canvas>
+          <p class="note" id="bench-note"></p>
+        </div>
+        <div>
+          <h3>Training loss</h3>
+          <canvas id="loss" role="img" aria-label="Training and validation loss by epoch"></canvas>
+          <p class="note" id="train-note"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="how" id="how">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><b>Collect.</b> Every hour, GitHub Actions pulls 90 days of hourly candles for 8 coins from the public Coinbase Exchange API.</li>
+        <li><b>Normalise.</b> Returns, dollar volume, high-low range and order flow become robust z-scores against the previous week, so every coin shares one scale with no look-ahead.</li>
+        <li><b>Learn normal.</b> A 2-layer LSTM autoencoder in PyTorch compresses each 24-hour window to 16 numbers and rebuilds it. It retrains weekly.</li>
+        <li><b>Score.</b> The model is exported to ONNX and scored with onnxruntime. Severity is reconstruction error divided by the 99th percentile seen on validation data.</li>
+        <li><b>Explain.</b> The feature with the largest error names the tremor: price move, volume burst, volatility or buying and selling pressure.</li>
+        <li><b>Publish.</b> This page rebuilds on GitHub Pages. The same model ships as a FastAPI Docker image.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>Market data from the Coinbase Exchange public API. Educational project; not investment advice.</footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/palakgupta7456/crypto-anomaly-detector
+
+jobs:
+  test:
+    name: Lint, train and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install (CPU-only PyTorch)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[train,api,dev]" onnxscript
+      - run: ruff check .
+      - name: Train on synthetic data and export ONNX
+        run: |
+          python -m cad.synthetic
+          python -m cad.train
+      - run: pytest -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: models/
+
+  docker:
+    name: Build and push Docker image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Use the production model if published, else the CI-trained one
+        uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: models
+      - run: |
+          if git fetch --depth 1 origin live-data 2>/dev/null; then
+            git show FETCH_HEAD:models/autoencoder.onnx > models/autoencoder.onnx
+            git show FETCH_HEAD:models/meta.json > models/meta.json
+            echo "Using production model"
+          fi
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test
+        run: |
+          docker run -d -p 8000:8000 --name api ${{ env.IMAGE }}:${{ github.sha }}
+          for i in $(seq 1 20); do curl -fs localhost:8000/health && break; sleep 2; done
+          curl -fs localhost:8000/health | grep '"model_loaded":true'
+      - name: Push
+        if: github.event_name != 'pull_request'
+        run: |
+          docker tag ${{ env.IMAGE }}:${{ github.sha }} ${{ env.IMAGE }}:latest
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
