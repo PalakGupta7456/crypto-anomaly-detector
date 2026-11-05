@@ -13,7 +13,19 @@ A deep-learning system that watches 8 crypto markets (BTC, ETH, SOL, XRP, ADA, D
 
 ## Results
 
-<!-- RESULTS -->
+Benchmarked on real Coinbase data (Aug–Nov 2026, 8 coins). Planted anomalies were added to the held-out final 15% of the period:
+
+| Detector | ROC-AUC | PR-AUC | Precision@k |
+|---|---|---|---|
+| **LSTM autoencoder (this project)** | **0.935** | 0.140 | 0.085 |
+| Isolation Forest | 0.643 | 0.031 | 0.043 |
+| "Flag big price moves" rule (\|z\| of return) | 0.756 | 0.170 | 0.362 |
+
+**How to read this.** The autoencoder is by far the best *overall* ranker: ROC-AUC 0.94 against 0.64 for Isolation Forest. It catches every anomaly type, including volume bursts with a flat price, which the price rule cannot see at all.
+
+The simple rule, however, has better precision at the very top of the list. Real crypto markets are full of large but *normal* moves, and the autoencoder ranks some of those highly too. Combining the two signals into a hybrid score is the obvious next step.
+
+Reporting this trade-off honestly is the point of the benchmark. Scores update every week when the model retrains.
 
 **How it is evaluated.** Real market anomalies have no labels, so the project follows the standard *synthetic injection* protocol used in anomaly-detection research. Four kinds of known shocks are planted into the held-out test period (the last 15% of time, never seen in training):
 - price spikes
