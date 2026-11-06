@@ -9,7 +9,7 @@
 
 A deep-learning system that watches 8 crypto markets (BTC, ETH, SOL, XRP, ADA, DOGE, AVAX, LINK) every hour and flags hours whose price, volume and volatility behaviour it has not seen before. It runs serverless on GitHub Actions, trains with PyTorch, and serves with ONNX Runtime.
 
-![Dashboard](docs/screenshot.png)
+![Dashboard](docs/screenshot.jpg)
 
 ## Results
 
